@@ -1,0 +1,100 @@
+---
+title: "lab_01"
+author: "Derek Willis"
+date: "2025-01-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Turn off scientific notation
+options(scipen=999)
+```
+
+## About this lab
+
+To complete this lab, you need to: \* run existing code as directed (look for **Task**). \* modify existing code as directed (look for **Task**). \* write code in empty codeblocks provided to answer questions included (look for **Q**). \* write out the answer in the form of a complete sentence in the space given (look for **A**). When you are finished, commit changes and push to your personal GitHub repo, then submit the URL to this document on ELMS.
+
+Remember to add any new verbs or concepts to your class reference notebook!
+
+## Load libraries and establish settings
+
+**Task** Run the codeblock below to load the Tidyverse. To run the codeblock, hit the little green play button in the upper right corner of the gray area (the codeblock) below.
+
+```{r}
+# Load the tidyverse. If you have not installed the tidyverse already, remove the # from the next line and run it first.  
+# install.packages('tidyverse')
+library(tidyverse)
+```
+
+## Load Data
+
+We're going to load the Maryland churches data and the megachurches data.
+
+**Task** Run the codeblock below to load the data, which is contained in CSV files.
+
+```{r}
+md_churches <- read_csv("churches_md.csv")
+megachurches <- read_csv("megachurches.csv")
+```
+
+## Answer questions
+
+**Q1** Which NTEE classification code (the NTEE_CD column) has the most churches in Maryland? Show the classification codes (you can find out what they mean here: https://www.irs.gov/pub/irs-soi/eo-info.pdf) with the highest count first. Is this result useful? Why or why not? **A1**
+
+A1: Code X20 has the most churches in the state of Maryland. I would not consider this very useful at this point becasue I have no idea what the codes for NTEE_CD means.
+
+```{r}
+md_churches |>
+  group_by(NTEE_CD) |>
+  summarise(
+    count = n()
+  )|> arrange(desc(count))
+```
+
+**Q2** Find out which denomination has the greatest average (mean) size for its megachurches. Your code must show the denomination with the greatest average size first. **A2**
+
+A2: The denomination with the biggest mean size across megachurches is evangelical Covenant.
+
+```{r}
+megachurches |>
+  group_by(denomination) |>
+  summarise(
+    mean_size = mean(size),
+  ) |> 
+  arrange(desc(mean_size))
+```
+
+**Q3** Count the number of megachurches for each state and city combination. Which state/city combination has the most megachurches? Which city is the most surprising, and why? **A3**
+
+A3: The city and state with the highest combination is Houston, Texas, with 37 churches that are considered mega churches. The thing that most surprised me was that Indianapolis was so high on the list at number seven. Other than Chicago -- which isn't that surprising to me because I can imagine that a lot of African American churches could be consider mega churches and have deep roots in Chicago -- Indianapolis is the most northern city in the top ten, which I would not have guessed to be the case.
+
+```{r}
+megachurches |> 
+  group_by(state, city) |> 
+  summarise(
+    count = n()
+  ) |> 
+  arrange(desc(count))
+
+
+```
+
+**Q4** Given the results for Q3, what's a story that you could tell with this information? Think broadly, and consider what additional information you might need to make your story stronger. You also should think about what cities and states aren't in the results. **A4**
+
+A4: What jumps off the screen to me is the sheer number of megachurches in Texas. Houston, Dallas, and Austin are the top three cities in the country in terms of mega churches, and San Antonio is also within the top 20.
+
+I think that a story that could be written would maybe be something like: "In a South dominated by mega churches, Texas stands above the rest." Now I would need more data than just the cities being at the top, and I would also need to more conclusively prove that the south is where the majority of mega churches are, but I think the data found in Q3 is a good start.
+
+**Q5** Take one of the questions you listed in the final question of the pre_lab and try to answer it here in code. If you don't know how to fully answer it, write what code you can and describe in words what else you would need to do. If you got an answer, is it interesting? **A5**
+
+A5: One of the questions I asked in the pre lab was "what is the biggest church in Maryland?" Using the data that the mega churches data base has on population sizes I was able to find that the biggest mega church in Maryland is the First Baptist Church of Glenarden. Now I don't know if this is really the biggest church in Maryland, and I may have to go to ther data sources to confirm this, but based on the mega chruch databese this is what I was able to find.
+
+```{r}
+megachurches |> 
+  group_by(church_name, state, size) |> 
+  summarise(
+    count = n()
+  ) |> 
+  arrange(desc(size))
+```
