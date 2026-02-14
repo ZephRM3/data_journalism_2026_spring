@@ -1,0 +1,142 @@
+---
+title: "lab_02"
+author: "Derek Willis"
+date: "2026-01-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and establish settings
+
+```{r}
+# Turn off scientific notation
+options(scipen=999)
+
+library(tidyverse)
+library(lubridate)
+```
+
+## Load Data
+
+Let's keep working with the Maryland churches data and the Maryland campaign expenses data we used in the pre_lab. Write code to load those two CSV files from the data folder.
+
+```{r}
+md_churches_ex <- read_csv("data/md_church_expenditures.csv")
+churches_md <- read_csv("data/churches_md.csv")
+```
+
+## Answer questions
+
+**Q1.** How many churches in Maryland have "ORTHODOX" in their name? Which cities have the most churches with "ORTHODOX" in the name, and how does that compare to city totals for all churches in Maryland?
+
+**A1.**
+
+There are 48 total Orthodox churches in Maryland. Baltimore and Silver Spring (SS) have the most churches with five each. This aligns neatly with the total number of churches each in Maryland city, which is again topped by Baltimore and SS. However, where Baltimore and SS have an equal number of Orthodox churches, Baltimore dwarfs SS in overall churches with over 800 more across the board.
+
+```{r}
+Orthodox_Churches <- churches_md |> filter(str_detect(NAME, "ORTHODOX"))
+
+Orthodox_Churches |> 
+  group_by(CITY) |> 
+  summarise(
+    count = n()
+  )|>
+  arrange(desc(count))
+
+churches_md |> 
+   group_by(CITY) |> 
+  summarise(
+    count = n()
+  )|>
+  arrange(desc(count))
+
+```
+
+**Q2.** Of the churches and cities listed in A1, which ones are the most interesting to you, and why? What's a good reporting question you have about them?
+
+**A2.**
+
+I would say Silver Spring and Hyattsville. Mostly because when it comes to Orthodox churches they are comparable (in number of churches) to Baltimore, which is a city that is vastly larger than both of them. My reporting question would then be that? Why are there higher number of orthodox practicing christians in Silver Spring and Hyattsville than almost anywhere else in Maryland?
+
+**Q3** The campaign expense data contains payments to churches in Maryland. Write code that finds only those payments made to churches by party central committees (there are a couple of ways to do this, but one simple way). Then write code to find which party committee spent the most total dollars and how much did they spend? **A3.**
+
+```{r}
+central_party_church_spending <- md_churches_ex |>
+  filter(`Committee Type` == "Party Central")
+
+central_party_church_spending |>
+  group_by(`Committee Name`) |> 
+  summarize(total = sum(`Transaction Amount`)) |>
+  arrange(desc(total))
+```
+
+**Q4.** Using the same Maryland campaign expenses data, change the datatype of the `Transaction Date` column so that it is a date and not a chr, saving the result as the same dataframe. Then create a new column for the week based on `Transaction Date` using the `week()` function (representing the week of the year). Then write code that shows the total amount spent each week using that new column. Write a sentence describing the pattern of spending over time - when has there been more spending and when has there been less? **A4.**
+
+The spending over time seems to peak towards the end of year, with two big peaks in week 33 and week 47. I coded a rudimentary line graph to help me see the pattern. There seems to be generally less spending in the first half of the year, and it then spikes up to a slightly higher rate in the second half of the year, but major spending seems to happen at very specific moments.
+
+```{r}
+md_churches_ex <- md_churches_ex |> mutate(`Transaction Date`= mdy(`Transaction Date`))
+
+
+
+```
+
+```{r}
+md_churches_ex <- md_churches_ex |>
+  mutate(Week_of_the_year = week(`Transaction Date`))
+```
+
+```{r}
+Church_expenditures_per_week <- md_churches_ex |> 
+  group_by(Week_of_the_year) |>
+  summarise(total_amount = sum(`Transaction Amount`)) |>
+  arrange(desc(total_amount))
+```
+
+```{r}
+Church_expenditures_per_week |> 
+  ggplot() +
+  geom_line(aes(x = Week_of_the_year, y = total_amount, linewidth = .1))
+```
+
+**Q5.** Using the `md_churches` data, create a column using `mutate()` and `case_when()` that tries to accomplish the same thing we did in the pre_lab - pulling the denomination or faith from church names. This will take longer than the pre_lab because there are more churches in the data, and you should use <https://www.thearda.com/us-religion/census/congregational-membership?y=2020&y2=0&t=1&c=24> as a reference for the most common denominations in Maryland. What you want is to populate your new column with something like the "Family" column on that web page, using "Other" for those you're not able to classify. After creating your new column, write code that shows the top five denominations or faiths by number of churches in Maryland. You won't get all of them, but try to get as many as you can. Do these totals seem accurate to you? Are there denominations or faith groups that are obviously missing? Which one(s)?
+
+**A5**
+
+My top five can be seen in the code below, I made it into the dataset "md_denominations_total." The top five was in the following order: NA, Baptist, Lutheran, Methodist, Presbyterian. NA being number one makes sense to me, according to the link above the most populous denominations are nondenominational churches, and their isn't really a way to narrow those down to a denominations category. The rest of the list makes relative sense to me, Catholic not being in the top five is surprising and I would imagine, inaccurate. The problem with that is that I wonder if many catholic churches are called simply "parishes," however this poses a problem as other denominations also name their churches parishes such as the Episcopals. This list is also missing the Mormon churches and that is because looking through the data I could not really find many in this data set, additionally I couldn't find a good keyword to look them up, becasue they have like three different names, and also call their churches temples. I also decided not use "temple" as the search term for jewish synagogues as many other churches also use the word temple and that would be innacurate. However, I suspect that this resulted in a sever undercount of jewish temples in my data.
+
+```{r}
+churches_md <- churches_md|>
+  mutate(
+    denomination = case_when(
+        str_detect(NAME, "BAPTIST") ~ "Baptist",
+        str_detect(NAME, "CATHOLIC") ~ "Catholic",
+        str_detect(NAME, "METHODIST") ~ "Methodist",
+        str_detect(NAME, "PRESBY") ~ "Presbyterian",
+        str_detect(NAME, "LUTHERAN") ~ "Lutheran",
+        str_detect(NAME, "EPISCOPAL") ~ "Episcopal",
+        str_detect(NAME, "AME") ~ "AME",
+        str_detect(NAME, "ORTHODOX") ~ "Orthodox",
+        str_detect(NAME, "CHURCH OF CHRIST") ~ "Church of Christ",
+        str_detect(NAME, "ADVENTIST") ~ "Seventh-Day Adventist",
+        str_detect(NAME, "SYNAGOGUE") ~ "Jewish",
+        str_detect(NAME, "BUDDHIST") ~ "Buddhist",
+        str_detect(NAME, "HINDU") ~ "Hindu",
+        str_detect(NAME, "SIKH") ~ "Sikh",
+        .default = NA
+      )
+  )
+```
+
+```{r}
+md_denominations_total <- churches_md |> 
+  group_by(denomination) |>
+  summarise(
+    count = n()
+  ) |>
+  arrange(desc(count))
+```
+
