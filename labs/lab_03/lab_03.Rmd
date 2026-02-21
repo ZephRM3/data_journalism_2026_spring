@@ -1,0 +1,174 @@
+---
+title: "lab_03"
+author: "Derek Willis"
+date: "2026-01-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## TASK: Load libraries you'll need to load and clean the data
+
+```{r}
+# Turn off scientific notation
+options(scipen=999)
+library(tidyverse)
+
+```
+
+## TASK: Load data and clean up the column names
+
+Load the two datasets we worked with in the pre_lab: the Maryland payments to vendors and Maryland grants and loans and, using `janitor`, change the columns so that they are lower-cased and any spaces are replaced with underscores. You also will want to make it so that you can find the most records possible when using filter(), which means making the records look as consistent as possible in terms of their formatting.
+
+```{r}
+# Load in the Maryland state agency payments data
+payments <- read_csv("data/State_of_Maryland_Payments_Data__FY2008_to_FY2024_20260122.csv.zip", guess_max=392488)
+# Load in the Maryland grants and loan data
+md_grants_loans <- read_csv("data/State_of_Maryland_Grant_and_Loan_Data__FY2009_to_FY2024_20260122.csv")
+```
+
+```{r}
+library(janitor)
+library(lubridate)
+```
+```{r}
+cleaned_md_grants_loans <- md_grants_loans |>
+  clean_names() |> 
+  rename(source = grantor) |> 
+  mutate(source = str_to_upper(source), grantee = str_to_upper(grantee), description = str_to_upper(description)) |> 
+  distinct() |>
+  mutate(zip5 = str_sub(zip_code, start=1L, end=5L)) |>
+  mutate(zip5 = case_when(
+    zip5 == "Vario" ~ NA,
+    zip5 == "UB7 O" ~ NA,
+    zip5 == "UB7 " ~ NA,
+    .default = zip5
+  ))
+
+cleaned_payments <- payments |> 
+  clean_names()
+  
+
+```
+
+
+## Answer questions
+
+Q1: You want to know how much money state agencies have paid to religious organizations in a particular denomination, but to do that you'll need to find the variations of how that denomination's organizations might be listed. Pick a denomination or faith and write code to find rows where the vendor name contains the name you're searching for, starting with a simple word or phrase and then getting more complex if needed. NOTE: you need to pick one that has at least some payments!
+
+HINT: you should use filter() just once, and inside your filter you want to look for the variations one at a time. Think "this version OR that version."
+
+When you have found as many as possible, save the result to a new dataframe called \`rel_orgs\`\`. Write the denomination or faith, and how many records you found.
+
+A1:
+
+The denomination I chose was Catholic Churches, and to avoid also searching for charities and schools, I specified churches in my filter. When looking for "CATHOLIC CHURCH" in particular, I was able to find 34 different results.
+
+
+```{r}
+cath_orgs <- cleaned_payments |>
+  filter(str_detect(vendor_name, "CATHOLIC CHURCH")) |>
+  group_by(vendor_name, fiscal_year) |>
+  summarize(
+    count = n(),
+    total_amount = sum(amount)
+  ) |> 
+  arrange(desc(total_amount))
+
+```
+
+Q2: Using that `rel_orgs` dataframe, write code to calculate the total amount of payments to those religious organizations for each fiscal year. Which fiscal year had the largest total amount? Are there any aspects of the results that stand out to you?
+
+A2:
+
+The year that had the highest total amount was 2024, followed closely by 2025. The thing that stood out to me the most is that it seems that 2024 is somewhat of an outlier year where somewhere around $150,000 more than the next highest year was paid. 2026 already has a significant amount of money given as well, which makes me wonder of it will match 2024. I also wonder if 2024 was so high because of the election year, and the spending that went on in the senatorial campaign in the state. 
+
+```{r}
+highest_payments_fiscal_year <- cath_orgs |>
+  group_by(fiscal_year) |> 
+  summarise(
+    total_amount = sum(total_amount)
+  ) |> 
+  arrange(desc(total_amount))
+  
+
+```
+
+Q3. You're interested in examining state payments (not grants or loans) to Catholic Charities organizations. Use `filter()` and `str_detect()` to find those payments and save them to a new dataframe. Then look carefully at that list - what cleaning will it require to ensure that you can standardize the vendor names? Next, write a plan - not code for this step - describing how you would clean up the records so that the end result is that you'd have each unique vendor listed only once. You *can* write code for this, but what's required is a step-by-step process.
+
+A3.
+
+Step 1:
+Google "Associated Catholic Charities" to find out what they are, so that we can verify that the seprate entries that fit that model are the same entity. In the case of Maryland, all of those are likely the same entity, listed in a different way. There are also other crossing over entries most of them most likely being the archdioceses of Washington.
+
+Step 2:
+What I would do then next, and this is becasue there are only 14 entries and I feel like it would relatively reasonable is to use case_when() to sort the options into "Associated Catholic Charities (Baltimore), Archdioceses of Washington, and then the maybe 2 separate enties into their individual title.
+
+Step 3: After I've made my case when I would use that to construct a new dataset called like "cleaned_cath_charities" and then sort in the same way we did the previous dataset. 
+
+```{r}
+cath_charities <- cleaned_payments |>
+  filter(str_detect(vendor_name, "CATHOLIC CHARITIES")) |>
+  group_by(vendor_name) |>
+  summarize(
+    count = n(),
+    total_amount = sum(amount)
+  ) |> 
+  arrange(desc(total_amount))
+```
+
+Q4: You want to the leading recipients of state grant money given for the purpose of preventing hate crimes. Filter the data to find grants that fit that description; you'll want to make sure that you locate all of them. Then calculate the total amount of money for each grantee. Write a sentence or two describing the top 20 grantees and identify the most interesting one(s) to you. You can do some research about them to back up your answer.
+
+A4:
+
+The vast majority of the top 20 are religious institutions, whether they be religious congregations, community centers, or summer camp organizations. Of the religions, Jewish institutions make up the majority of the list, with over half of the top 20 being Jewish institutions. The most interesting findings about the grantees to me were 1: the predominence of Jewish institutions, though that does make sense, and 2: that the soxt highest receiving grantee was the Banner School, which is explicitly a non-sectarian, private school. It would be interesting to know why they recieved money to prevent hate crimes. 
+
+```{r}
+hate_crime_gandls <- cleaned_md_grants_loans |> 
+  filter(str_detect(description, "HATE CRIME")) |> 
+  group_by(grantee, amount) |> 
+   summarize(
+    count = n(),
+    amount = sum(amount)
+  ) |> 
+  arrange(desc(amount))
+
+```
+
+Q5: Using the Maryland grants and loan data, write code to find grant recipients of the African American Heritage Preservation Program (AAHPP) and produce a list of grantees along with the total amount they received. Describe which of the top 20 recipients are churches or church-related (you may need to do some research to figure that out). Which of those grantees are most interesting to you?
+
+A5:
+
+There are five churches I was able to find within the top 20 of the list. All of the five within the top 20 earning, were some type of Methodist denomination. The Bethel AME church really stood out to me. It seems to be a pretty large church, and is also incredibly old. According to it's website they are celebrating their 240th anniversary, which makes it only ten years younger than the US.
+
+```{r}
+aahpp_gandl_grantees <- cleaned_md_grants_loans |> 
+  filter(str_detect(description, "AAHPP")) |> 
+  group_by(grantee, amount) |> 
+  summarize(
+    count = n(),
+    amount = sum(amount)
+  ) |> 
+  arrange(desc(amount))
+  
+```
+
+Q6: Using the denomination that you are collecting church information on, write code to find any payments to those organizations that are listed in the grants and loan data. How many records do you find? What's the most interesting payment you find in the data and why?
+
+A6: 
+
+I actually got a ton of results for Adventist, however, the results were due to the fact that state has given a ton of money over the years to a private adventist college in Takoma Park, and Adventist Healthcare that is based in Gaithersburg. There are a couple other little Adventist schools that got some money, and only one "seventh-Day Adventist" church, which is in Dundalk. That grant to the church is very interesting because it was quite substantial, over $300,000, and after looking at the description, I found that it was for "HUMANITARIAN SUPPORT AND ASSISTANCE TO MIGRANTS AND ASYLUM SEEKERS." This is the first grant I've seen like this, and I wonder how much of this happens at other churches in Maryland, and if it has continued to happen. This grant was given in 2024, and I wonder if under the new federal admin if grants like this too churches to help migrants have continued or slowed down.
+
+```{r}
+adventist_gandl <- cleaned_md_grants_loans |> 
+  filter(str_detect(grantee, "ADVENTIST")) |> 
+  group_by(grantee, amount, fiscal_year) |> 
+  summarize(
+    count = n(),
+    amount = sum(amount)
+  ) |> 
+  arrange(desc(amount))
+```
+
