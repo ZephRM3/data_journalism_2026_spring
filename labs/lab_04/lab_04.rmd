@@ -1,0 +1,147 @@
+---
+title: "lab_04"
+author: "Derek Willis"
+date: "2026-01-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## About this lab
+
+To complete this lab, you need to: \* run existing code as directed (look for **Task**). \* modify existing code as directed (look for **Task**). \* write code in empty codeblocks provided to answer questions included (look for **Q**). \* write out the answer in the form of a complete sentence in the space given (look for **A**).
+
+When you are finished, commit changes and push to your personal GitHub repo, then submit the URL to this document on ELMS.
+
+## Load libraries and establish settings
+
+You'll need to load two packages for this: the tidyverse and janitor.
+
+**Task** load these two packages.
+
+```{r}
+library(tidyverse)
+library(janitor)
+
+# Turn off scientific notation
+options(scipen=999)
+```
+
+For this lab, we want to investigate payments by Maryland state agencies to church-related organizations. For example, we could ask which churches or religious organizations have received the most money from the state? Which state agencies make the most payments to religious organizations? We have the data, but it's messy - names of vendors are spelled differently and capitalized differently - and we need to clean it up. We'll use a combination of RStudio and OpenRefine to do that.
+
+The basic process here is to start in RStudio, export data so that we can use OpenRefine to clean it up, and then bring it back into RStudio to finish our analysis.
+
+## Load Data
+
+You'll need to load one data set, a CSV file of Maryland payments to church-related organizations located in the data folder called "church_payments.csv"
+
+**Task** Create a codeblock below, then read the data in and assign it to an appropriate variable name. 
+
+```{r}
+church_payments <- read_csv("data/church_payments.csv")
+cleaned_church_payments <- read_csv("data/church-payments-csv.csv")
+```
+
+## Answer questions
+
+**Q1.** You've been assigned to investigate payments by Maryland state agencies to various religious organizations. There's a vendor_name column in the data, but it has variations in how many of them are listed. You'll need to complete the following steps:
+
+1. Write code to see the leading recipients to get a sense of which organizations you'll want to focus your cleaning efforts on. Keep that handy.
+2. Using OpenRefine, create a project using the original CSV file, create a copy of the `vendor_name` column called `vendor_clean` and then standardize it, focusing on the vendors that appear most often. Pay particular attention to variations of the top recipients, but also clean up other common vendors you notice.
+3. When you are done standardizing `vendor_clean`, export it as a new CSV file to your data folder, *giving it a different name* and read it back into RStudio as a new dataframe.
+4. Using that `vendor_clean` column in your new dataframe, calculate the total amount of payments to the leading recipients. Compare it to the totals you generated in step 2 and describe the differences.
+
+**A1.**
+Comparing the top ten after cleaning shows that Catholic Charities stays number one which is unsurprising given that it was already #1 and #2 when ungrouped. Goodwill Mennonite Homes jumped up to the number two spot, which makes sense given that they also occupied two positions within the top ten even when ungrouped. A lot of the other names stayed the same with a couple other lutheran insitutions entering the top ten after cleaning.
+
+```{r}
+top_vendors <- church_payments |> 
+  group_by(vendor_name) |> 
+  summarise(
+    count = n(),
+    amount = sum(amount)
+  ) |> 
+  arrange(desc(amount))
+
+cleaned_top_vendors <- cleaned_church_payments |> 
+  group_by(clean_vendor_name) |> 
+  summarise(
+    count = n(),
+    amount = sum(amount)
+  ) |> 
+  arrange(desc(amount))
+
+top_vendors
+cleaned_top_vendors
+
+```
+
+**Q2.** Let's examine the top recipients of state payments. Using your cleaned dataframe from Q1, for the top 10 organizations, look up what kind of services they provide. Are they churches that run social service programs? Religious-affiliated nonprofits? Care facilities? Write some sentences describing what you found about the top recipients.
+
+**A2.**
+Associated Catholic Charities does a lot of different things within the community, from adult education to violence prevention. Washington Adventist University is a university that receives some funding from the state, though they are a private institution. The Methodist board of Child Care, is a big provider of schooling for young children all across the state. The Kennedy School is another school for children and young adults that is run through the Catholic Church. All of the rest of the results in the top ten, like the Mennonite Home, appear to be old peoples homes/communities. 
+
+
+**Q3.** Which state agencies have made the most payments to religious organizations? Calculate the total amount paid by each agency (using `agency_name`) and show the top 10 agencies. What do you notice about the agencies making these payments? Why might these particular agencies be paying religious organizations? What could you do to improve the accuracy of the results?
+
+**A3.** 
+
+It makes sense to me that the department of education is making a lot of payments. There are several schools and universities within the top ten highest vendors. The department of health showing up as much as it does also makes sense, the state clearly gives a lot of money to churches to help care for the elderly and other disadvantaged groups like migrants or people with mental health problems. I would assume that the housing department falls under low-income housing developments run by churches and again elderly homes. 
+
+To improve our results we could clean the data in the same way we cleaned the vendor data. A lot of these results are overlapping results with slightly tweaked department names. 
+
+```{r}
+top_agencies <- cleaned_church_payments |> 
+  group_by(agency_name) |> 
+  summarise(
+    count = n(),
+    amount = sum(amount)
+  ) |> 
+  arrange(desc(amount))
+
+top_agencies
+```
+
+**Q4.** Let's look at the data over time. Using your cleaned dataframe, calculate the total amount paid to religious organizations by fiscal year. Which years saw the highest total payments? Create a sentence or two describing the trend you observe. Then, pick one of the top-spending agencies from Q3 and calculate its yearly payments to religious organizations. How does this agency's spending pattern compare to the overall trend?
+
+**A4.**
+
+Overall the pattern seems to show that spending by these state agnecies has increased year after year since 2022. Previously the pattern of spending wasn't as clear and the spending not as high, however from 2022 onward the spending has risen every year, and peaked in 2025. 
+
+I chose to look specifically at the health department spending as best as I could, and what I can see from my code is that the trend kind of plays out in the same way. Both 2024, and 2025 are in the top 5 highest spending years for the department of health. However, I generally don't think that the pattern is as strong as it is in the overall spending year to year, so I would wager that the year to year increase is being driven by a differnet agency. 
+
+```{r}
+yearly_spending <- cleaned_church_payments |> 
+  group_by(fiscal_year) |> 
+  summarise(
+    total_amount = sum(amount)
+  ) |>
+  arrange(desc(total_amount))
+
+health_dep_spending <- cleaned_church_payments |> 
+  group_by(fiscal_year) |> 
+  filter(str_detect(agency_name, "HEALTH")) |> 
+  summarise(
+    total_amount = sum(amount)
+  ) |>
+  arrange(desc(total_amount))
+
+
+yearly_spending
+health_dep_spending
+```
+```
+
+**Q5** Your editor asks you to summarize your findings about Maryland state payments to religious organizations. Based on your analysis, what patterns have you found? What questions does this data raise that you'd want to investigate further through reporting? What's the best story idea you've found here?
+
+**A5**
+
+- The biggest trends that I see are one: That the state is paying churches a ton of money to churches to house elderly people, and provide schooling to children, and two: that the states spending towards churches has steadily increased for the past four years. 
+
+- I would want to know just how many housing spaces for the elderly in Maryland are church operated, and how much these churches rely on state funding to keep these operations running?
+- Why has spending for churches increased so much and so continuosly over the last four years?
+- Why is the state giving a lot of money to the private Adventist college? (more minor question.)
+
+The best story idea I think would be a more thorough investigation of churches and elderly/retirment homes. The amount per year stuff is interesting as well, but it seems like a much bigger problem that I'm not sure I would know how to start.
