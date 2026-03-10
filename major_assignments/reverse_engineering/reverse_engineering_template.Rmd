@@ -25,7 +25,7 @@ In this notebook, we are reverse engineering the story, [STORY NAME](STORY URL)
 Loading required libraries for this analysis.
 
 ```{r echo=FALSE, message=FALSE}
-
+library(tidyverse)
 ```
 
 ## Load and Cleaning Data
@@ -38,6 +38,18 @@ In this section, describe the source of the data, write a basic data dictionary 
 # Path to data should be loaded from folder "data" i.e. read_csv("data/name_of_data.csv")
 
 # Clean required data and prepare for analysis if needed. 
+rls_streaming <- read_csv("data/rls_streaming.csv", col_names = FALSE, skip = 1) |> 
+  rename(
+    weight = X1, 
+    in_person_attendence = X2,
+    streaming_attendence = X3,
+    education_level = X4,
+    household_income = X5, 
+    ethnicity = X6,
+    race = X7,
+    gender = X8,
+    birthdecade = X9
+  )
 
 
 ```
@@ -47,13 +59,29 @@ In this notebook, we are reverse engineering five sentences from the story.
 
 ### Sentence 1
 
-* **Sentence text**: [Paste in sentence to engineer here]
+* **Sentence text**: Education does not meaningfully distinguish Americans in terms of weekly in-person religious attendance, but it sharply differentiates who participates online.
 * **Analysis summary**: [Write up two to three sentences describing the results of your analysis.  Were you able to confirm the finding? If not, why not?]
 
 ```{r}
 # Put code to reverse engineer sentence here
+rls_streaming |> 
+  filter(streaming_attendence == 2 ) |> 
+  filter(education_level == 1 | education_level == 2)
+
+rls_streaming |> 
+  filter(streaming_attendence == 2) |> 
+  filter(education_level == 3 | education_level == 4)
+
+rls_streaming |> 
+  filter(in_person_attendence == 2) |> 
+  filter(education_level == 1 | education_level == 2)
+
+rls_streaming |> 
+  filter(in_person_attendence == 2) |> 
+  filter(education_level == 3 | education_level == 4)
 
 # Display results of code below this codeblock
+
 
 ```
 
