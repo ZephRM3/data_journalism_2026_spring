@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = TRUE)
 options(scipen=999)
 
 # load your libraries
+
+library(tidyverse)
 ```
 
 ## Getting Started
@@ -28,8 +30,15 @@ First, let's load all the data we'll need for this lab.
 
 ```{r}
 # Load the five clergy contribution files for different election cycles
+clergy_contribs_2016 <- read_csv("data/clergy_contribs_2016.csv")
+clergy_contribs_2018 <- read_csv("data/clergy_contribs_2018.csv")
+clergy_contribs_2020 <- read_csv("data/clergy_contribs_2020.csv")
+clergy_contribs_2022 <- read_csv("data/clergy_contribs_2022.csv")
+clergy_contribs_2024 <- read_csv("data/clergy_contribs_2024.csv")
 
 # Load the two United Methodist data files
+umdata_people <- read_csv('data/umdata_people.csv')
+umdata_people_all <- read_csv('data/umdata_people_all.csv')
 ```
 
 ## Answer questions
@@ -38,7 +47,33 @@ Q1. Now you're interested in understanding giving patterns by election cycle. Co
 
 A1. 
 
+The cycle with both the most money donated and the highest number of contributions was 2024. The amount of money contributed seems to graph pretty equally to the number of contributions made which makes sense. The higher the amount of contributions, the higher the toal amount given will be.
+
 ```{r}
+clergy_contribs_combined <-
+  bind_rows(
+    list(clergy_contribs_2016, 
+         clergy_contribs_2018, 
+         clergy_contribs_2020, 
+         clergy_contribs_2022, 
+         clergy_contribs_2024)
+    )
+
+clergy_contribs_combined |> 
+  group_by(two_year_transaction_period) |>
+  summarize(
+    total_amount = sum(contribution_receipt_amount),
+    num_contributions = n(),
+  ) |> 
+  arrange(desc(total_amount))
+
+clergy_contribs_combined |> 
+  group_by(two_year_transaction_period) |>
+  summarize(
+    total_amount = sum(contribution_receipt_amount),
+    num_contributions = n(),
+  ) |> 
+  arrange(desc(num_contributions))
 ```
 
 Q2. Some clergy members have been more consistent donors across election cycles. Using the combined contribution data, create a dataframe that shows each contributor and how many different election cycles they contributed in (someone who gave in 2016, 2018, and 2024 would have 3 cycles). You can use group_by and summarize to do this. Who contributed in all five election cycles? How many people contributed in only one cycle vs. multiple cycles?
@@ -46,39 +81,170 @@ Q2. Some clergy members have been more consistent donors across election cycles.
 A2. 
 
 ```{r}
+clergy_totals_by_cycle <- clergy_contribs_combined |>
+  group_by(contributor_name, two_year_transaction_period) |>
+  summarize(
+    total_amount = sum(contribution_receipt_amount),
+    num_contributions = n(),
+  )
+
+clergy_wide <- clergy_totals_by_cycle |>
+  select(contributor_name, two_year_transaction_period, total_amount) |>
+  pivot_wider(
+    names_from = two_year_transaction_period,
+    values_from = total_amount,
+    values_fill = 0
+  )
+
+five_cycle_contribs <- clergy_wide |> 
+  filter(`2024` > 0, `2022` > 0, `2020` > 0, `2018` > 0, `2016` > 0)
+
+one_cycle_contribs <-
+  clergy_wide |> 
+  group_by(contributor_name) |> 
+  summarise(
+    contrib_2016 = n_distinct(`2016`), 
+    contrib_2018 = n_distinct(`2018`),
+    contrib_2020 = n_distinct(`2020`),
+    contrib_2022 = n_distinct(`2022`),
+    contrib_2024 = n_distinct(`2024`)
+  )
+ #This is the last thing I tried, I really couldn't figure out how to get the second part of this question.#
+
+
+   
 ```
 
 Q3. You're interested in whether there are geographic patterns in clergy giving. Using the combined contribution data, calculate the total amount contributed by clergy in each city (`contributor_city`). What are the top 5 cities by total contribution amount? Then calculate the number of unique contributors in each of those top 5 cities. Are the cities with the most money also the cities with the most contributors, or are there differences?
 
+There are some differences within the top five. For instance Towson and Ellicot City are within the top five in terms of contributions, at 3 and 5 respectively, however, they are not within the top five in terms of total amount. Baltimore, Silver Spring, and Bowie are all within the top five though, so generally having more contributions does equate to a higher amount given, but Towson is strangely number three in total contributions, while being number 10 in total amount.
+
 A3. 
 
 ```{r}
+
+top_cities_amount <- clergy_contribs_combined |> 
+  group_by(contributor_city) |> 
+  summarise(
+    total_amount = sum(contribution_receipt_amount)
+  ) |> 
+  arrange(desc(total_amount))
+
+top_cities_amount
+
+top_citites_contribs <- clergy_contribs_combined |>
+  group_by(contributor_city) |>
+  summarize(
+    num_contributions = n()
+  ) |> 
+  arrange(desc(num_contributions))
+
+top_citites_contribs
+  
+  
+
+
 ```
 
 Q4. Use `pivot_wider` to create a summary showing each contributor and their total contributions in the 2020 and 2024 election cycles only (so create a dataframe with columns for contributor_name, total_2020, and total_2024). Then calculate a new column showing the change in contribution amount from 2020 to 2024. Which contributors increased their giving the most? Which decreased the most?
 
+The biggest increases were Doris Cowan and Michael freeman, who donated 46378.77, and 16600.00	more respectively in 2024. The biggest drop offs were John Price and Eldridge Spearmen who contributed 17199.00, and 14320.00 respectively. 
+
 A4. 
 
 ```{r}
+contribs_2020_and_2024 <- clergy_totals_by_cycle |>
+  select(contributor_name, two_year_transaction_period, total_amount) |>
+  pivot_wider(
+    names_from = two_year_transaction_period,
+    values_from = total_amount,
+    values_fill = 0
+  ) |> 
+  select(contributor_name, `2024`, `2020`) |> 
+  mutate(change_in_amount = (`2024` - `2020`))
+
+contribs_2020_and_2024 |> 
+  arrange(desc(change_in_amount))
+
+contribs_2020_and_2024 |> 
+  arrange(change_in_amount)
+
+
+
 ```
 
 Q5. Now let's work with the United Methodist data. Join the `umdata_people` and `umdata_people_all` datasets using `GCFAId` as the key. Before joining, select only the unique columns from `umdata_people_all` (ConferenceId and ConferenceName) to avoid duplicate columns. After joining, filter for only clergy (not laity) and count them by conference and AccountStatus. Which conferences have the most clergy, and how do Active vs. Deceased clergy compare?
 
 A5.
 
+The conferences with the most clergy seem to be in the south, and the west of the country. Northern Georgia and Western North Carolina for instance are 1 and 2 and West Ohio is 3. The North East is not really present in the top 10. There are roughly double the amount of active clergy than there are deceased clergy. 
+
 ```{r}
+people_matched <- umdata_people |>
+  inner_join(
+    umdata_people_all |> select(GCFAId, ConferenceId, ConferenceName),
+    join_by(GCFAId)
+  ) |> 
+  filter(str_detect(ClergyOrLay, "Clergy"))
+
+people_matched |> 
+  group_by(Conferences) |> 
+  summarise(
+    total_clergy = n()
+  ) |> 
+arrange(desc(total_clergy))
+
+people_matched |> 
+  group_by(AccountStatus) |> 
+  summarise(
+    active_vs_deceased = n()
+  ) |> 
+  arrange(desc(active_vs_deceased))
+
 ```
 
 Q6. You want to explore whether there's any overlap between clergy who made political contributions and clergy in the United Methodist database. Using the combined contribution data and the UM data, identify any contributors whose names (first and last name) match clergy in the `umdata_people` file. How many matches do you find? What challenges does this kind of name-based matching present? Are there ways to improve the accuracy of matching?
 
 A6. 
 
+I found 41 matches between the datasets when I did a regular innerjoin. This didn't really make sense to me becasue I figured tehre would be more, and when I looked through the data I could find more by hand. I thought that I would try making sure the case matched, which is the code I wrote beloew, however, when I run this code I get no matches which I don't understand. 
+
+All in all, matching data like this without a unique ID is a bad idea,a dn the results will be mixed and inconsistent. This could be because the data entry could be inconsistent or other factors.
+
 ```{r}
+clergy_contribs_combined_lowercase <- clergy_contribs_combined |> 
+  mutate(contributor_first_name = str_to_lower(contributor_first_name)) |> 
+  mutate(contributor_last_name = str_to_lower(contributor_last_name))
+
+methodist_contribs <- umdata_people |>
+  inner_join(
+    clergy_contribs_combined_lowercase |> select(contributor_first_name, contributor_last_name, contribution_receipt_amount),
+    join_by(FirstName == contributor_first_name, LastName == contributor_last_name)
+  )
+
 ```
 
 Q7. Choose your own adventure: Come up with a question that requires you to use at least one join and one aggregation (sum, mean, count, etc.) using either the clergy contribution data, the UM data, or both. Write the question, then write the code to answer it, and provide an answer.
 
 A7: 
 
+Question: How many clergy are full clergy, compared to lay members, and how many are not designated? Based on the matched data for both UM data sets.
+
+Answer:
+In the combined data there are 52651 full clergy, 23324 lay members and 1310 undesignated members.  
+
 ```{r}
+people_matched_2 <- umdata_people |>
+  inner_join(
+    umdata_people_all |> select(GCFAId, ConferenceId, ConferenceName),
+    join_by(GCFAId)
+  )
+
+people_matched_2 |> 
+  group_by(ClergyOrLay) |> 
+  summarise(
+    total_lay = n()
+  )
+
+  
 ```
