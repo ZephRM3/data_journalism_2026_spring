@@ -1,0 +1,31 @@
+---
+title: "data_aquisition"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(janitor)
+```
+
+```{r}
+md_um_plain <- read_csv("united_methodist_md.csv") |> clean_names() |> 
+  mutate(column = str_trim(str_split_fixed(church, ",", 4)[,2]))
+
+md_united_methodist <- read_csv("united_methodist_md.csv") |> clean_names() |> 
+  filter(str_detect(church, "MD")) |> 
+  mutate(church = str_trim(str_split_fixed(church, ",", 3)[,2]))|> 
+  mutate(church = str_remove(church, ","))
+
+md_towns_counties <- read_csv("MD_City_Lookup_Table (1).csv") |> clean_names()
+
+md_um_combined <- md_united_methodist |> 
+  inner_join(md_towns_counties, join_by(church == city)) |> 
+  select(church, county)
+
+pg_um_churches <- md_um_combined |> 
+  filter(str_detect(county, "Prince George's County"))
+
+pg_county_ame <- 
+```
+
