@@ -1,0 +1,169 @@
+---
+title: "data_analysis"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(tidycensus)
+library(tigris)
+```
+
+
+```{r}
+clergy_contribs_2016 <- read_csv("clergy_contribs_2016.csv")
+clergy_contribs_2018 <- read_csv("clergy_contribs_2018.csv")
+clergy_contribs_2020 <- read_csv("clergy_contribs_2020.csv")
+clergy_contribs_2022 <- read_csv("clergy_contribs_2022.csv")
+clergy_contribs_2024 <- read_csv("clergy_contribs_2024.csv")
+
+clergy_contribs_combined <- bind_rows(list(clergy_contribs_2016, 
+                                           clergy_contribs_2018, 
+                                           clergy_contribs_2020, 
+                                           clergy_contribs_2022, 
+                                           clergy_contribs_2024)) |> 
+  mutate(zip5 = str_sub(contributor_zip, start=1L, end=5L))
+
+clergy_totals_by_cycle <- clergy_contribs_combined |>
+  group_by(contributor_name, two_year_transaction_period, contributor_employer, zip5, committee_name) |>
+  summarize(
+    total_amount = sum(contribution_receipt_amount),
+    num_contributions = n(),
+  )
+
+clergy_wide <- clergy_totals_by_cycle |>
+  select(contributor_name, contributor_employer, two_year_transaction_period, total_amount, zip5, committee_name) |>
+  pivot_wider(
+    names_from = two_year_transaction_period,
+    values_from = total_amount,
+    values_fill = 0) |> 
+  rename(denomination = contributor_employer) |> 
+  mutate(
+    denomination = case_when(
+        str_detect(denomination, "BAPTIST") ~ "Baptist",
+        str_detect(denomination, "CATHOLIC") ~ "Catholic",
+        str_detect(denomination, "METHODIST") ~ "Methodist",
+        str_detect(denomination, "PRESBY") ~ "Presbyterian",
+        str_detect(denomination, "LUTHERAN") ~ "Lutheran",
+        str_detect(denomination, "EPISCOPAL") ~ "Episcopal",
+        str_detect(denomination, "AME") ~ "AME",
+        str_detect(denomination, "ORTHODOX") ~ "Orthodox",
+        str_detect(denomination, "CHURCH OF CHRIST") ~ "Church of Christ",
+        str_detect(denomination, "ADVENTIST") ~ "Seventh-Day Adventist",
+        str_detect(denomination, "SYNAGOGUE") ~ "Jewish",
+        str_detect(denomination, "BUDDHIST") ~ "Buddhist",
+        str_detect(denomination, "HINDU") ~ "Hindu",
+        str_detect(denomination, "SIKH") ~ "Sikh",
+        str_detect(denomination, "RETIRED") ~ "Retired",
+        str_detect(denomination, "SELF") ~ "Self Employed",
+        str_detect(denomination, "ARCHDIOCESE") ~ "Catholic",
+        str_detect(denomination, "CONFERENCE") ~ "Seventh-Day Adventist",
+        .default = NA
+      )
+  ) |> 
+  mutate(
+    affiliation = case_when(
+      str_detect(committee_name, "ACTBLUE") ~ "DEMOCRAT",
+      str_detect(committee_name, "HILLARY") ~ "DEMOCRAT",
+      str_detect(committee_name, "KAMALA") ~ "DEMOCRAT",
+      str_detect(committee_name, "BIDEN") ~ "DEMOCRAT",
+      str_detect(committee_name, "FETTERMAN") ~ "DEMOCRAT",
+      str_detect(committee_name, "DSCC") ~ "DEMOCRAT",
+      str_detect(committee_name, "DEMOCRATIC") ~ "DEMOCRAT",
+      str_detect(committee_name, "STOP REPUBLICAN") ~ "DEMOCRAT",
+      str_detect(committee_name, "STOP") ~ "DEMOCRAT",
+      str_detect(committee_name, "HARRIS") ~ "DEMOCRAT",
+      str_detect(committee_name, "DCCC") ~ "DEMOCRAT",
+      str_detect(committee_name, "HARRIS") ~ "DEMOCRAT",
+      str_detect(committee_name, "ALSOBROOKS") ~ "DEMOCRAT",
+      str_detect(committee_name, "BERNIE") ~ "DEMOCRAT",
+      str_detect(committee_name, "RASKINS") ~ "DEMOCRAT",
+      str_detect(committee_name, "HARRIS") ~ "DEMOCRAT",
+      str_detect(committee_name, "REPUBLICAN & CONVENTION") ~ "REPUBLICAN",
+      str_detect(committee_name, "MAKE AMERICA GREAT AGAIN") ~ "REPUBLICAN",
+      str_detect(committee_name, "TRUMP") ~ "REPUBLICAN",
+      str_detect(committee_name, "WINRED") ~ "REPUBLICAN",
+      str_detect(committee_name, "RAND") ~ "REPUBLICAN",
+      str_detect(committee_name, "REPUBLICAN NATIONAL COMMITTEE") ~ "REPUBLICAN",
+      str_detect(committee_name, "NEVER SURRENDER") ~ "REPUBLICAN",
+      .default = NA
+    )
+)
+  
+
+total_denomination_contribs <- clergy_wide |> 
+  group_by(denomination) |> 
+  summarise(
+    count = n()
+  ) |> 
+  rename(total_amount = count) |> 
+  arrange(desc(total_amount))
+
+#This code I think may help me on questions 1 and 3. 1 because I want to work on seeing the majoirty party affiliation for individual denominations in Maryland, and 3 because it's at least a start at trying to county the retired or self employed clergy. The problem is all the NAs and I'm kind of lost on how to lower that, I think case_when might be limited here.#
+
+total_party_affiliation <- clergy_wide |> 
+  group_by(affiliation) |> 
+  summarise(
+    count = n()
+  ) |> 
+  rename(total_amount = count) |> 
+  arrange(desc(total_amount))
+
+#This is also code aimed toward question 1 and trying to determine party affiliation.#
+
+denomination_vs_affiliation <- 
+
+write_csv(total_denomination_contribs, "total_denomintation_contribs.csv")
+
+write_csv(clergy_wide, "clergy_wide_data.csv")
+
+
+
+```
+```{r}
+md_state_clergy_contribs <- read_csv("md_contribs.csv")
+
+md_state_clergy_contribs <- md_state_clergy_contribs |> 
+  mutate(committee_name = str_to_upper(committee_name)) |> 
+  mutate(contributor_county_of_residence = str_to_upper(contributor_county_of_residence)) |> 
+  mutate(committee_type = str_to_upper(committee_type)) 
+
+#I at least wanted to load and start cleaning the data you provided last class. I'll keep working with this more for my last question#
+```
+
+
+
+Data Progress: 
+
+So far I have all the data loaded and have loaded all the libraries I think I'll need. I basically just followed everything we did in lab 6. 
+
+Questions:
+What denominations have the most clergy contributing money to political campaigns?
+
+Based on the loaded data I have so far this I think will be relatively simple. I think with a filtered search of the contributor_employer column, I'll be able to narrow down denominations pretty easily, filter them out indivually, and then add up the total amount contributed by denomination.
+
+Are there certain cities or areas that produce clergy that contribute to political campaigns more than others?
+
+This should be fairly simple as well with the contributor_city, and contributor_zip columns. I still have to determine how narrowly I'll want to define the geographic area. I would think first to use counties and I think that the work we did in the last lab with zipcodes and mapping could be very useful here. I've also downloaded Tigris and Tidycensus to work with census data as well like you suggested I think that will be very interesting.
+
+How many of the clergy on the list are actually employed by or working for a real church? 
+
+With this data this might be a fairly hard question to answer, I may need to revise or delete this one.
+
+Do the outlier individual contributors have anything in common?
+
+This I think should be fairly simple. 
+
+What are the general trends in giving by cycle? Are contributions increasing year to year, and what could that trend look like in the future? 
+
+This also shouldn't be too big of a problem to handle with the data I have in this notebook.
+
+Do these clergy donors also give to Maryland state campaigns? 
+
+I really like this question, do you have a suggested data set I could pull this from?
+
+
+
+
