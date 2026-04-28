@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction 
 
-In this notebook, we are reverse engineering the story, [STORY NAME](STORY URL)
+In this notebook, we are reverse engineering the story, [The People Streaming Church Aren’t Who You Think](https://thescoop.org/religion/reverse-engineering/streaming-church.html)
 
 ## Load libraries
 
@@ -38,6 +38,7 @@ In this section, describe the source of the data, write a basic data dictionary 
 # Path to data should be loaded from folder "data" i.e. read_csv("data/name_of_data.csv")
 
 # Clean required data and prepare for analysis if needed. 
+
 rls_streaming <- read_csv("data/rls_streaming.csv", col_names = FALSE, skip = 1) |> 
   rename(
     weight = X1, 
@@ -48,9 +49,8 @@ rls_streaming <- read_csv("data/rls_streaming.csv", col_names = FALSE, skip = 1)
     ethnicity = X6,
     race = X7,
     gender = X8,
-    birthdecade = X9
+    birth_decade = X9
   )
-
 
 ```
 
@@ -59,78 +59,218 @@ In this notebook, we are reverse engineering five sentences from the story.
 
 ### Sentence 1
 
-* **Sentence text**: Education does not meaningfully distinguish Americans in terms of weekly in-person religious attendance, but it sharply differentiates who participates online.
+* **Sentence text**: "Education does not meaningfully distinguish Americans in terms of weekly in-person religious attendance, but it sharply differentiates who participates online." (This is characterized by a graph titled "Weekly Religious Attendance by Education" the results of which I will attempt to copy).
+
 * **Analysis summary**: [Write up two to three sentences describing the results of your analysis.  Were you able to confirm the finding? If not, why not?]
+
+I was able to recreate the chart almost exactly (visualization not included though I think that would be simple enough). The only difference ended up being that my and his analysis for high school or less in-person and high school or less streaming were off by about a point. I think that this may have had to do with the way we cleaned our data if anything. 
 
 ```{r}
 # Put code to reverse engineer sentence here
-rls_streaming |> 
-  filter(streaming_attendence == 2 ) |> 
-  filter(education_level == 1 | education_level == 2)
 
-rls_streaming |> 
-  filter(streaming_attendence == 2) |> 
-  filter(education_level == 3 | education_level == 4)
-
-rls_streaming |> 
-  filter(in_person_attendence == 2) |> 
-  filter(education_level == 1 | education_level == 2)
-
-rls_streaming |> 
-  filter(in_person_attendence == 2) |> 
-  filter(education_level == 3 | education_level == 4)
+rls_education <- rls_streaming |> 
+  select(weight, in_person_attendence, streaming_attendence, education_level) |> 
+  filter(in_person_attendence !=99, streaming_attendence !=99, education_level !=99) |> 
+  mutate(in_person_weekly = case_when(
+    in_person_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(streaming_weekly = case_when(
+    streaming_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(education_combined = case_when(
+    education_level <= 2 ~ "High School or less",
+    education_level >= 3 ~ "College"
+  )) |> 
+group_by(education_combined) |> 
+    summarize(
+    pct_in_person = weighted.mean(in_person_weekly, weight) * 100,
+    pct_streaming = weighted.mean(streaming_weekly, weight) * 100
+ ) 
 
 # Display results of code below this codeblock
 
-
+rls_education
+ 
 ```
 
 ### Sentence 2
 
-* **Sentence text**: [Paste in sentence to engineer here]
+* **Sentence text**: ["Among folks who have earned a bachelor’s degree, less than 10% watch online. For those who stopped at high school, online attendance is nearly double that rate (about 17%).” (This specifically pertains to people making over 100k a year, there is graph titled "Weekly Religous Attendance by Education and Income," which this sentence is refering to where this number is displayed.)]
+
 * **Analysis summary**: [Write up two to three sentences describing the results of your analysis.  Were you able to confirm the finding? If not, why not?]
+
+So I wasnt able to exactly replicate the results. I got pretty close, and the gap demonstrated by the graph is visible it's just not as large. Why the data in the original story shows attendance for un-college educated people to be at around 17% I was only able to get the number to be about 12%. My number for college educated and above was much closer, off by one about 2% I would say, it also was not exact. I think that this was due to both how I cleaned the data, but also there being a lot of numbers that I miss when I did the case_when for income. For some reason when I do the case when for income, it creates a fourth column of data under "N/A" which I think is where I could be losing data points contributing to the discrepency. I still think that overall, this is a decent replication of the results in principle. 
 
 ```{r}
 # Put code to reverse engineer sentence here
 
+rls_education_income <- rls_streaming |> 
+  select(weight, in_person_attendence, streaming_attendence, education_level, household_income) |> 
+  filter(in_person_attendence !=99, streaming_attendence !=99, education_level !=99, household_income !=99) |> 
+  mutate(in_person_weekly = case_when(
+    in_person_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(streaming_weekly = case_when(
+    streaming_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(household_income_combined = case_when(
+    household_income <= 3 ~ "50k",
+    household_income <= 5 ~ "50k-100k",
+    household_income <= 8 ~ "Highest Income 100k+"
+  )) |> 
+  mutate(education_combined = case_when(
+    education_level <= 2 ~ "High School or less",
+    education_level >= 3 ~ "College"
+  )) |> 
+  group_by(household_income_combined, education_combined) |> 
+    summarize(
+    pct_streaming = weighted.mean(streaming_weekly, weight) * 100
+ )  |> 
+  filter(str_detect(household_income_combined, "Highest Income"))
+
 # Display results of code below this codeblock
+
+rls_education_income
 
 ```
 
 ### Sentence 3
 
-* **Sentence text**: [Paste in sentence to engineer here]
+* **Sentence text**: [Who is the most likely to show up on Sunday? It’s college-educated folks who make $50K–$100K per year. (This is again a graph related sentence which I will attempt to replicate. The number being looked for is 30.7% in the graph titled "Weekly Religious Attendence by Education and Income")]
+
 * **Analysis summary**: [Write up two to three sentences describing the results of your analysis.  Were you able to confirm the finding? If not, why not?]
+
+I think that I was able to get this data point pretty accurately. I got around 30.7% which was exactly the number I was looking for. The non-college educated number is slightly off which is puzzling, but I was really able to nail the exact figure I was lloking for with college educated, middle-income respondents.
 
 ```{r}
 # Put code to reverse engineer sentence here
 
+rls_education_income_2 <- rls_streaming |> 
+  select(weight, in_person_attendence, streaming_attendence, education_level, household_income) |> 
+  filter(in_person_attendence !=99, streaming_attendence !=99, education_level !=99, household_income !=99) |> 
+  mutate(in_person_weekly = case_when(
+    in_person_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(streaming_weekly = case_when(
+    streaming_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(household_income_combined = case_when(
+    household_income <= 3 ~ "50k",
+    household_income <= 5 ~ "Middle Income 50k-100k",
+    household_income  <= 8 ~ "Highest Income 100k+"
+  )) |> 
+  mutate(education_combined = case_when(
+    education_level <= 2 ~ "High School or less",
+    education_level >= 3 ~ "College"
+  )) |> 
+  group_by(household_income_combined, education_combined) |> 
+    summarize(
+    pct_in_person = weighted.mean(in_person_weekly, weight) * 100
+ ) |> 
+  filter(str_detect(household_income_combined, "Middle"))
+
 # Display results of code below this codeblock
+
+rls_education_income_2
 
 ```
 
 ### Sentence 4
 
-* **Sentence text**: [Paste in sentence to engineer here]
+* **Sentence text**: ["Note that among White Americans who have earned a college degree, only 8% are watching weekly online. That’s about half the rate of White Americans who stopped at a high school diploma." (This again has to do with a graph, this time a graph which incorporates race into it's findings, I will attempt to find that 8% number. The graph is titled "Weekly Religous Participation by Race and Education.")]
 * **Analysis summary**: [Write up two to three sentences describing the results of your analysis.  Were you able to confirm the finding? If not, why not?]
+
+This one I was also able to get essentially exactly as well. The result I was specifically looking for was 8% (and 15% for non-college educated which I also got), and I got it exactly. Once I figured out the weekly case_when all of these calculations were really a lot more simple. 
 
 ```{r}
 # Put code to reverse engineer sentence here
 
+rls_education_race <- rls_streaming |> 
+  select(weight, in_person_attendence, streaming_attendence, education_level, race) |> 
+  filter(in_person_attendence !=99, streaming_attendence !=99, education_level !=99, race !=9) |> 
+  mutate(in_person_weekly = case_when(
+    in_person_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(streaming_weekly = case_when(
+    streaming_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(education_combined = case_when(
+    education_level <= 2 ~ "High School or less",
+    education_level >= 3 ~ "College"
+  )) |> 
+  mutate(race = case_when(
+    race == 1 ~ "White",
+    race == 2 ~ "Black",
+    race == 3 ~ "Asian",
+    race == 4 ~ "Mixed",
+    race == 5 ~ "Other"
+  )) |> 
+group_by(education_combined, race) |> 
+    summarize(
+    pct_streaming = weighted.mean(streaming_weekly, weight) * 100
+ ) |> 
+  filter(str_detect(race, "White"))
+
 # Display results of code below this codeblock
+
+rls_education_race
 
 ```
 
 ### Sentence 5
 
-* **Sentence text**: [Paste in sentence to engineer here]
+* **Sentence text**: ["Take, for instance, people born in the 1980s who have graduate degrees. When asked about in-person attendance, 23% indicated that they were there every week. On the question of watching online, it was only 10%. That’s not a small difference."]
 * **Analysis summary**: [Write up two to three sentences describing the results of your analysis.  Were you able to confirm the finding? If not, why not?]
+
+I think that I got pretty darn close here again. I would say that my number for people born in the 1980's with a graduate degree is really, really close, especially with the percentage who say they stream service online, that number is within rounding range. The number in person os off by more but is very close regardless. 
 
 ```{r}
 # Put code to reverse engineer sentence here
+rls_education_age <- rls_streaming |> 
+  select(weight, in_person_attendence, streaming_attendence, education_level, birth_decade) |> 
+  filter(in_person_attendence !=99, streaming_attendence !=99, education_level !=99, birth_decade !=99) |> 
+  mutate(in_person_weekly = case_when(
+    in_person_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(streaming_weekly = case_when(
+    streaming_attendence <= 2 ~ 1, 
+    TRUE ~ 0
+  )) |> 
+  mutate(education_level = case_when(
+    education_level == 1 ~ "High School or Less",
+    education_level == 2 ~ "Some College",
+    education_level == 3 ~ "Bachelors Degree",
+    education_level == 4 ~ "Masters/Doctorate"
+  )) |>
+  mutate(birth_decade = case_when(
+    birth_decade == 1 ~ "Before 1940",
+    birth_decade == 2 ~ "1940s",
+    birth_decade == 3 ~ "1950s",
+    birth_decade == 4 ~ "1960s",
+    birth_decade == 5 ~ "1970s",
+    birth_decade == 6 ~ "1980s",
+    birth_decade == 7 ~ "1990s",
+    birth_decade == 8 ~ "2000s",
+  )) |> 
+group_by(education_level, birth_decade) |> 
+    summarize(
+    pct_in_person = weighted.mean(in_person_weekly, weight) * 100,
+    pct_streaming = weighted.mean(streaming_weekly, weight) * 100
+ ) |> 
+  filter(str_detect(birth_decade, "1980s")) |> 
+  filter(str_detect(education_level, "Masters"))
 
 # Display results of code below this codeblock
 
-```
+rls_education_age
 
--30-
+```
