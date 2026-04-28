@@ -32,7 +32,9 @@ Like so many R package names, rvest is a bad pun. You're supposed to read it to 
 **Task** Run the following code in the gray-colored codeblock below to load the libraries we'll use
 
 ```{r}
-#| output: false
+install.packages("rvest")
+install.packages("httr")
+
 library(tidyverse)
 library(rvest)
 library(httr)
@@ -189,3 +191,6 @@ df |>
 Now you have a clean, structured dataset from a page that offered no download button. From here you could analyze which data have the most appointments, search for specific pastors, or track which congregations are receiving new leadership.
 
 What patterns do you notice in this data? What stories might it suggest? **Answer**
+
+
+From what it loos like appointments have started ramping up recently (not counting this most recent week). This came after an initial flurry of appointments early in the year. I'm not sure what this suggests, but it seems like UM definitely does take time to deliberate the appointments of pastors. I'd wonder if the retirements are announced early, and the acutal reassignmnets and appointments are done later in the year as appointments are decided. 
