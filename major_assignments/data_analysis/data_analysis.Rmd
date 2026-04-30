@@ -119,12 +119,32 @@ write_csv(total_denomination_contribs, "total_denomintation_contribs.csv")
 
 write_csv(clergy_wide, "clergy_wide_data.csv")
 
-
-
-clery_total <- clergy_wide |> 
-  filter(!is.na(denomination)) |> distinct(contributor_name, denomination)
+clergy_total <- clergy_wide |> 
+  filter(!is.na(denomination)) |> distinct(contributor_name, denomination, affiliation)
 
 ```
+```{r}
+clery_total |> 
+  group_by(denomination) |> 
+  summarise(
+    count = n()
+  ) |> 
+  rename(total_amount = count) |> 
+  arrange(desc(total_amount))
+  
+  clergy_affilliation <- clergy_total |> 
+    group_by(denomination, affiliation) |> 
+    summarise(
+      count = n()
+    ) |> 
+  rename(total_amount = count) |> 
+  pivot_wider(names_from = affiliation, values_from = total_amount) |> 
+    mutate(total_clergy = (DEMOCRAT + REPUBLICAN + `NA`)) |> 
+    mutate(pct_democrat = (DEMOCRAT / total_clergy) * 100) |> 
+    mutate(pct_republican = (REPUBLICAN / total_clergy) * 100)
+  
+```
+
 ```{r}
 md_state_clergy_contribs <- read_csv("md_contribs.csv")
 
@@ -135,37 +155,19 @@ md_state_clergy_contribs <- md_state_clergy_contribs |>
 
 #I at least wanted to load and start cleaning the data you provided last class. I'll keep working with this more for my last question#
 ```
-
-
-
-Data Progress: 
-
-So far I have all the data loaded and have loaded all the libraries I think I'll need. I basically just followed everything we did in lab 6. 
-
 Questions:
 What denominations have the most clergy contributing money to political campaigns?
 
-Based on the loaded data I have so far this I think will be relatively simple. I think with a filtered search of the contributor_employer column, I'll be able to narrow down denominations pretty easily, filter them out indivually, and then add up the total amount contributed by denomination.
-
 Are there certain cities or areas that produce clergy that contribute to political campaigns more than others?
-
-This should be fairly simple as well with the contributor_city, and contributor_zip columns. I still have to determine how narrowly I'll want to define the geographic area. I would think first to use counties and I think that the work we did in the last lab with zipcodes and mapping could be very useful here. I've also downloaded Tigris and Tidycensus to work with census data as well like you suggested I think that will be very interesting.
 
 How many of the clergy on the list are actually employed by or working for a real church? 
 
-With this data this might be a fairly hard question to answer, I may need to revise or delete this one.
-
 Do the outlier individual contributors have anything in common?
-
-This I think should be fairly simple. 
 
 What are the general trends in giving by cycle? Are contributions increasing year to year, and what could that trend look like in the future? 
 
-This also shouldn't be too big of a problem to handle with the data I have in this notebook.
-
 Do these clergy donors also give to Maryland state campaigns? 
 
-I really like this question, do you have a suggested data set I could pull this from?
 
 
 
