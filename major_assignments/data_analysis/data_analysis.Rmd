@@ -121,6 +121,9 @@ write_csv(clergy_wide, "clergy_wide_data.csv")
 
 
 
+clery_total <- clergy_wide |> 
+  filter(!is.na(denomination)) |> distinct(contributor_name, denomination)
+
 ```
 ```{r}
 md_state_clergy_contribs <- read_csv("md_contribs.csv")
