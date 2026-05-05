@@ -186,7 +186,7 @@ dem_clergy_affilliation_and_contributions |>
   )
   
 
-#I think all this code here goes pretty far (as far as I think I want to go) into answering question 1. There are a lot of cool stats (like retired clergy being the number one contributors by democratic clergy) in here and I think some good opportunities for visuals.
+#I think all this code here goes pretty far (as far as I think I want to go) into answering question 1. There are a lot of cool stats (like retired clergy being the number one contributors by democratic clergy) in here and I think some good opportunities for visuals. I think that what I did here, potentially opened up questions which I hadn't thought to ask before about retired and self employed clergy contributions compared to clergy that are still working or work for a established denomination. The sheer amount that republicans are outspent too is also I think newsworthy if not unexpected. I also think that the stats about which denominations are mostly Democratic or Republican are newsworthy, and interesting, especially the fact that the Catholic Church is the most evenly split denomination in the state.#
 ```
 
 ```{r}
@@ -213,7 +213,7 @@ md_clergy_county <- total_contribution |>
   inner_join(md_zipcodes, join_by(zip5 == zip_code)) |> 
   select(contributor_name, denomination, affiliation, total_contribution, county_name, zip5)
 
-#This is some work I did to start to get at the geography question. I think that I've managed to get every clergy that I want assigned a county. Now I don't really understand why the code doubles the amount of clergy in the dataframe, but I think that something like this is at least going down the right track.#
+#This is some work I did to start to get at the geography question. I think that I've managed to get every clergy that I want assigned a county. Now I don't really understand why the code doubles the amount of clergy in the dataframe, but I think that something like this is at least going down the right track. This is the question I spent the second most time on, but I still have work to do here.#
 
 ```
 
