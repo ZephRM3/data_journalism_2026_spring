@@ -9,6 +9,7 @@ library(janitor)
 library(lubridate)
 library(tidycensus)
 library(tigris)
+library(sf)
 ```
 
 
@@ -139,7 +140,7 @@ clergy_total |>
   
 total_contribution <- clergy_wide |> 
   mutate(total_contribution = (`2024`+ `2022` +`2020` + `2018` +  `2016`)) |> 
-  filter(!is.na(denomination)) |> distinct(contributor_name, denomination, affiliation, total_contribution) 
+  filter(!is.na(denomination)) |> distinct(contributor_name, denomination, affiliation, total_contribution, zip5) 
 
 total_contribution |> 
   filter(str_detect(affiliation, "DEMOCRAT")) |> 
@@ -164,40 +165,57 @@ clergy_affilliation_and_contributions <- total_contribution |>
       sum(total_contribution)
     )
 
-dem_clergy_affilliation_and_contributions <- total_contribution |> 
-    group_by(denomination, affiliation, total_contribution) |> 
-    filter(str_detect(affiliation, "DEMOCRAT")) |> 
-    summarise(
-      count = n()
-    ) |> group_by(denomination) |> 
-    summarise(
-      sum(total_contribution)
-    )
+dem_clergy_affilliation_and_contributions <- total_contribution |>
+  filter(str_detect(affiliation, "DEMOCRAT")) |>
+  group_by(denomination) |>
+  summarise(total = sum(total_contribution))
 
-rep_clergy_affilliation_and_contributions <- total_contribution |> 
-    group_by(denomination, affiliation, total_contribution) |> 
-    filter(str_detect(affiliation, "REPUBLICAN")) |> 
-    summarise(
-      count = n()
-    ) |> group_by(denomination) |> 
-    summarise(
-      sum(total_contribution)
-    )
+rep_clergy_affilliation_and_contributions <- total_contribution |>
+  filter(str_detect(affiliation, "REPUBLICAN")) |>
+  group_by(denomination) |>
+  summarise(total = sum(total_contribution))
 
 rep_clergy_affilliation_and_contributions |> 
   summarise(
-    sum(`sum(total_contribution)`)
+    sum(total)
   )
 
 dem_clergy_affilliation_and_contributions |> 
   summarise(
-    sum(`sum(total_contribution)`)
+    sum(total)
   )
   
 
 #I think all this code here goes pretty far (as far as I think I want to go) into answering question 1. There are a lot of cool stats (like retired clergy being the number one contributors by democratic clergy) in here and I think some good opportunities for visuals.
 ```
 
+```{r}
+md_county_population <- get_acs(geography = "county",
+              variables = c(population = "B01001_001"),
+              year = 2021,
+              state = "MD",
+              geometry = TRUE)
+
+all_zipcodes <- get_acs(
+  geography = "zcta",
+  variables = "B01003_001",
+  geometry = TRUE,
+  year = 2021
+)
+#Got this with the help of a LLM#
+
+md_zipcodes <- st_join(all_zipcodes, md_county_population, join = st_intersects) |> 
+  select(GEOID.x, NAME.x, NAME.y) |> 
+  rename(zip_code = GEOID.x, zip_name = NAME.x, county_name = NAME.y) |> 
+  filter(str_detect(county_name, "Maryland"))
+
+md_clergy_county <- total_contribution |> 
+  inner_join(md_zipcodes, join_by(zip5 == zip_code)) |> 
+  select(contributor_name, denomination, affiliation, total_contribution, county_name, zip5)
+
+#This is some work I did to start to get at the geography question. I think that I've managed to get every clergy that I want assigned a county. Now I don't really understand why the code doubles the amount of clergy in the dataframe, but I think that something like this is at least going down the right track.#
+
+```
 
 
 ```{r}
