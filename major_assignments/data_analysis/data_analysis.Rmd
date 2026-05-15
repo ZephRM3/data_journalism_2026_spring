@@ -89,6 +89,7 @@ clergy_wide <- clergy_totals_by_cycle |>
       str_detect(committee_name, "RAND") ~ "REPUBLICAN",
       str_detect(committee_name, "REPUBLICAN NATIONAL COMMITTEE") ~ "REPUBLICAN",
       str_detect(committee_name, "NEVER SURRENDER") ~ "REPUBLICAN",
+      str_detect(committee_name, "THE LINCOLN PROJECT") ~ "REPUBLICAN",
       .default = NA
     )
 )
@@ -140,40 +141,44 @@ clergy_total |>
   
 total_contribution <- clergy_wide |> 
   mutate(total_contribution = (`2024`+ `2022` +`2020` + `2018` +  `2016`)) |> 
-  filter(!is.na(denomination)) |> distinct(contributor_name, denomination, affiliation, total_contribution, zip5) 
+  filter(!is.na(denomination)) |> 
+  group_by(contributor_name, denomination, affiliation, zip5) |> 
+  summarize(grand_total = sum(total_contribution))
+
+  #distinct(contributor_name, denomination, affiliation, total_contribution, zip5) 
 
 total_contribution |> 
   filter(str_detect(affiliation, "DEMOCRAT")) |> 
   group_by(affiliation) |> 
   summarise(
-    sum(total_contribution)
+    sum(grand_total)
   )
 
 total_contribution |> 
   filter(str_detect(affiliation, "REPUBLICAN")) |> 
   group_by(affiliation) |> 
   summarise(
-    sum(total_contribution)
+    sum(grand_total)
   )
 
 clergy_affilliation_and_contributions <- total_contribution |> 
-    group_by(denomination, total_contribution) |> 
+    group_by(denomination, grand_total) |> 
     summarise(
       count = n()
     ) |> group_by(denomination) |> 
     summarise(
-      sum(total_contribution)
+      sum(grand_total)
     )
 
 dem_clergy_affilliation_and_contributions <- total_contribution |>
   filter(str_detect(affiliation, "DEMOCRAT")) |>
   group_by(denomination) |>
-  summarise(total = sum(total_contribution))
+  summarise(total = sum(grand_total))
 
 rep_clergy_affilliation_and_contributions <- total_contribution |>
   filter(str_detect(affiliation, "REPUBLICAN")) |>
   group_by(denomination) |>
-  summarise(total = sum(total_contribution))
+  summarise(total = sum(grand_total))
 
 rep_clergy_affilliation_and_contributions |> 
   summarise(
@@ -184,10 +189,30 @@ dem_clergy_affilliation_and_contributions |>
   summarise(
     sum(total)
   )
+
+write_csv(total_contribution, "total_contribution.csv")
   
 
 #I think all this code here goes pretty far (as far as I think I want to go) into answering question 1. There are a lot of cool stats (like retired clergy being the number one contributors by democratic clergy) in here and I think some good opportunities for visuals. I think that what I did here, potentially opened up questions which I hadn't thought to ask before about retired and self employed clergy contributions compared to clergy that are still working or work for a established denomination. The sheer amount that republicans are outspent too is also I think newsworthy if not unexpected. I also think that the stats about which denominations are mostly Democratic or Republican are newsworthy, and interesting, especially the fact that the Catholic Church is the most evenly split denomination in the state.#
 ```
+```{r}
+unique_total_contribution <- total_contribution |> 
+  mutate(contributor_name = str_to_upper(str_trim(contributor_name))) |> 
+  mutate(clean_name = str_remove(contributor_name, " [A-Z]$")) |> 
+  group_by(clean_name) |> 
+  summarize(
+    total_contributions = sum(grand_total, na.rm = TRUE),
+    num_donations = n(),
+    affiliation = first(affiliation) 
+  ) |> 
+  arrange(desc(total_contributions))
+
+unique_contributions_zips <- unique_total_contribution |> 
+  inner_join(total_contribution, join_by(clean_name == contributor_name)) |> 
+  distinct(clean_name, zip5)
+  
+```
+
 
 ```{r}
 md_county_population <- get_acs(geography = "county",
@@ -209,12 +234,54 @@ md_zipcodes <- st_join(all_zipcodes, md_county_population, join = st_intersects)
   rename(zip_code = GEOID.x, zip_name = NAME.x, county_name = NAME.y) |> 
   filter(str_detect(county_name, "Maryland"))
 
-md_clergy_county <- total_contribution |> 
+md_clergy_county <- unique_contributions_zips |> 
   inner_join(md_zipcodes, join_by(zip5 == zip_code)) |> 
-  select(contributor_name, denomination, affiliation, total_contribution, county_name, zip5)
+  select(clean_name, county_name, zip5, geometry) |> 
+  inner_join(unique_total_contribution, join_by(clean_name)) |> 
+  select(clean_name, total_contributions, num_donations, affiliation, county_name, zip5, geometry) |> 
+  distinct(clean_name, .keep_all = TRUE)
 
-#This is some work I did to start to get at the geography question. I think that I've managed to get every clergy that I want assigned a county. Now I don't really understand why the code doubles the amount of clergy in the dataframe, but I think that something like this is at least going down the right track. This is the question I spent the second most time on, but I still have work to do here.#
+md_county_contribs <- md_clergy_county |> 
+  group_by(county_name) |> 
+  summarise(
+    total_county_contribs = sum(total_contributions),
+    total_donations = sum(num_donations)
+  ) |> 
+  arrange(desc(total_county_contribs)) |> 
+  mutate(clean_county = str_remove(county_name, "County, Maryland"),
+         clean_county = str_remove(clean_county, ", Maryland"),
+         clean_county = str_trim(clean_county))
 
+md_counties <- counties() |> 
+  filter(STATEFP == "24")
+
+county_contrib_map <- md_counties|> 
+  left_join(md_county_contribs, join_by(NAME == clean_county)) |>
+  select(NAMELSAD, GEOID, total_county_contribs, total_donations, geometry) |> 
+  rename(full_county_name = NAMELSAD) |> 
+  arrange(desc(total_county_contribs))
+
+write_csv(md_clergy_county, "md_clergy_county.csv")
+write_csv(county_contrib_map, "county_contrib_map.csv")
+
+county_centroids <- st_centroid(md_counties)
+county_centroids_df <- as.data.frame(st_coordinates(county_centroids))
+county_centroids_df$NAME <- county_centroids$NAME
+
+ggplot() +
+  geom_sf(data=county_contrib_map, aes(fill=total_county_contribs)) +
+  theme_minimal() +
+  scale_fill_viridis_b(option="magma",trans = "log")
+
+
+```
+```{r}
+ggplot() +
+  geom_sf(data=md_counties) +
+  geom_sf(data=md_clergy_county, aes(total_contributions)) +
+  geom_text(aes(x = X, y = Y, label = NAME), data = county_centroids_df, size = 3, check_overlap = TRUE) +
+  scale_fill_viridis_b(option="magma",trans = "log") +
+  theme_minimal()
 ```
 
 
