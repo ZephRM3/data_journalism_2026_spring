@@ -10,6 +10,9 @@ library(lubridate)
 library(tidycensus)
 library(tigris)
 library(sf)
+library(ggthemes)
+library(stringr)
+library(scales)
 ```
 
 
@@ -119,6 +122,8 @@ clergy_total <- clergy_wide |>
   filter(!is.na(denomination)) |> distinct(contributor_name, denomination, affiliation)
 
 ```
+
+Question 1: What denominations have the most clergy contributing money to political campaigns?
 ```{r}
 clergy_total |> 
   group_by(denomination) |> 
@@ -191,15 +196,14 @@ dem_clergy_affilliation_and_contributions |>
   )
 
 write_csv(total_contribution, "total_contribution.csv")
-  
 
-#I think all this code here goes pretty far (as far as I think I want to go) into answering question 1. There are a lot of cool stats (like retired clergy being the number one contributors by democratic clergy) in here and I think some good opportunities for visuals. I think that what I did here, potentially opened up questions which I hadn't thought to ask before about retired and self employed clergy contributions compared to clergy that are still working or work for a established denomination. The sheer amount that republicans are outspent too is also I think newsworthy if not unexpected. I also think that the stats about which denominations are mostly Democratic or Republican are newsworthy, and interesting, especially the fact that the Catholic Church is the most evenly split denomination in the state.#
 ```
+Question 2: Are there certain cities or areas that produce clergy that contribute to political campaigns more than others?
 ```{r}
 unique_total_contribution <- total_contribution |> 
   mutate(contributor_name = str_to_upper(str_trim(contributor_name))) |> 
   mutate(clean_name = str_remove(contributor_name, " [A-Z]$")) |> 
-  group_by(clean_name) |> 
+  group_by(clean_name, denomination) |> 
   summarize(
     total_contributions = sum(grand_total, na.rm = TRUE),
     num_donations = n(),
@@ -210,11 +214,7 @@ unique_total_contribution <- total_contribution |>
 unique_contributions_zips <- unique_total_contribution |> 
   inner_join(total_contribution, join_by(clean_name == contributor_name)) |> 
   distinct(clean_name, zip5)
-  
-```
 
-
-```{r}
 md_county_population <- get_acs(geography = "county",
               variables = c(population = "B01001_001"),
               year = 2021,
@@ -238,7 +238,7 @@ md_clergy_county <- unique_contributions_zips |>
   inner_join(md_zipcodes, join_by(zip5 == zip_code)) |> 
   select(clean_name, county_name, zip5, geometry) |> 
   inner_join(unique_total_contribution, join_by(clean_name)) |> 
-  select(clean_name, total_contributions, num_donations, affiliation, county_name, zip5, geometry) |> 
+  select(clean_name, total_contributions, num_donations, affiliation, county_name, zip5, geometry,) |> 
   distinct(clean_name, .keep_all = TRUE)
 
 md_county_contribs <- md_clergy_county |> 
@@ -249,40 +249,194 @@ md_county_contribs <- md_clergy_county |>
   ) |> 
   arrange(desc(total_county_contribs)) |> 
   mutate(clean_county = str_remove(county_name, "County, Maryland"),
-         clean_county = str_remove(clean_county, ", Maryland"),
+         clean_county = str_remove(clean_county, "city, Maryland"),
          clean_county = str_trim(clean_county))
 
 md_counties <- counties() |> 
   filter(STATEFP == "24")
 
-county_contrib_map <- md_counties|> 
+county_contrib_map <- md_counties |> 
   left_join(md_county_contribs, join_by(NAME == clean_county)) |>
   select(NAMELSAD, GEOID, total_county_contribs, total_donations, geometry) |> 
   rename(full_county_name = NAMELSAD) |> 
-  arrange(desc(total_county_contribs))
+  arrange(desc(total_county_contribs)) |>
+  filter(!(full_county_name == "Baltimore city" & total_county_contribs > 100000)) |> 
+  filter(!(full_county_name == "Baltimore County" & total_county_contribs < 7000))
+#This is something I figured out with an llm, I messed up my joining when it came to Baltimore versus Baltimore City, and had to filter duplicates out.#
 
 write_csv(md_clergy_county, "md_clergy_county.csv")
 write_csv(county_contrib_map, "county_contrib_map.csv")
 
-county_centroids <- st_centroid(md_counties)
-county_centroids_df <- as.data.frame(st_coordinates(county_centroids))
-county_centroids_df$NAME <- county_centroids$NAME
-
-ggplot() +
-  geom_sf(data=county_contrib_map, aes(fill=total_county_contribs)) +
-  theme_minimal() +
-  scale_fill_viridis_b(option="magma",trans = "log")
-
-
 ```
+Total Contributions Map:
+https://datawrapper.dwcdn.net/MJD0d/1/
+
+Total Donations Map:
+https://datawrapper.dwcdn.net/tX6IK/2/
+
+
+Question 3: How many of the clergy on the list are actually employed by or working for a real church? (Or are not).
 ```{r}
-ggplot() +
-  geom_sf(data=md_counties) +
-  geom_sf(data=md_clergy_county, aes(total_contributions)) +
-  geom_text(aes(x = X, y = Y, label = NAME), data = county_centroids_df, size = 3, check_overlap = TRUE) +
-  scale_fill_viridis_b(option="magma",trans = "log") +
-  theme_minimal()
+total_clergy_by_denom <- unique_total_contribution |> 
+  group_by(denomination) |> 
+  summarise(
+    num_clergy = n()
+  ) |> 
+  arrange(desc(num_clergy))
+
+total_clergy_by_denom
+
+total_clergy_contribution_by_denom <- unique_total_contribution |> 
+  group_by(denomination) |> 
+  summarise(
+    num_clergy = n(),
+    total_denom_contrib = sum(total_contributions)
+  ) |> 
+  arrange(desc(total_denom_contrib))
+
+total_clergy_contribution_by_denom
+
+total_clergy_by_denom |> 
+  summarise(
+    total_clergy = sum(num_clergy), 
+    pct_retired_or_se = ((182 + 56) / (sum(num_clergy)) * 100)
+  )
+
+total_clergy_contribution_by_denom |> 
+  summarise(
+    total_money_contrib = sum(total_denom_contrib),
+    amt_contributed_by_retired_or_se = (74467.83 + 60815.54), 
+    pct_contributed_by_retired_or_se = ((74467.83 + 60815.54) / (sum(total_denom_contrib)) *100)
+  )
+
+write_csv(total_clergy_by_denom, "total_clergy_by_denom.csv")
+
+write_csv(total_clergy_contribution_by_denom, "total_clergy_contribution_by_denom.csv")
 ```
+Self Employed and Retired:
+https://datawrapper.dwcdn.net/HUqYX/1/ 
+
+Self Employed and Retired Contributions:
+https://datawrapper.dwcdn.net/1psMG/1/ 
+
+
+Question 4: Do the outlier individual contributors have anything in common?
+```{r}
+biggest_clergy_contribs <- unique_total_contribution |> 
+  head(100)
+
+most_denoms_donations_in_top100 <- biggest_clergy_contribs |> 
+  group_by(denomination) |> 
+  summarise(
+    num_donations = n()
+  ) |> 
+  arrange(desc(num_donations))
+
+most_denoms_donations_in_top100
+
+most_money_contributed_in_top100_by_denom <- biggest_clergy_contribs |> 
+  group_by(denomination) |> 
+  summarise(
+    amt_contributed = sum(total_contributions)
+  ) |> 
+  arrange(desc(amt_contributed))
+
+most_money_contributed_in_top100_by_denom 
+
+most_money_SANS_DORIS <- biggest_clergy_contribs |> 
+  filter(!str_detect(clean_name, "COWAN")) |> 
+  group_by(denomination) |> 
+  summarise(
+    amt_contributed = sum(total_contributions)
+  ) |>
+  arrange(desc(amt_contributed))
+  
+most_money_SANS_DORIS
+
+most_money_contributed_in_top100_by_denom  |>
+  ggplot() +
+  geom_bar(aes(x=reorder(denomination,  amt_contributed), weight= amt_contributed)) +
+  coord_flip() +
+  theme_economist() +
+  labs(
+    title=str_wrap("Amount of money donated by denominations based on the top 100 clergy donators", width = 40),
+    x = "Denominations",
+    y = "Money Contributed",
+    caption = "Federal Election Commission"
+  )
+
+most_money_SANS_DORIS  |>
+  ggplot() +
+  geom_bar(aes(x=reorder(denomination,  amt_contributed), weight= amt_contributed)) +
+  coord_flip() +
+  theme_economist() +
+  labs(
+    title=str_wrap("Amount of money donated by denominations based on the top 100 clergy donators, with Doris Cownan     removed", width = 40),
+    x = "Denominations",
+    y = "Money Contributed",
+    caption = "Federal Election Commission"
+  )
+  
+```
+
+Question 5: What are the general trends in giving by cycle? Are contributions increasing year to year, and what could that trend look like in the future? 
+```{r}
+donation_amt_per_cycle <- clergy_wide |> 
+  pivot_longer(
+    cols = c(`2016`, `2018`, `2020`, `2022`, `2024`),
+    names_to = "election_cycle",
+    values_to = "amt_donated"
+  ) |> 
+  group_by(election_cycle) |> 
+  summarise(
+    total_amt_donated = sum(amt_donated)
+  )
+
+donation_amt_per_cycle
+
+donation_amt_per_cycle |>
+  mutate(election_cycle = as.numeric(election_cycle)) |> 
+  ggplot() +
+  geom_line(aes(x=election_cycle, y=total_amt_donated)) +
+  geom_point(aes(x=election_cycle, y=total_amt_donated)) +
+  scale_y_continuous(labels = label_comma()) +
+  theme_minimal() +
+  labs(
+    title="Clergy contributions per election cycle generally rising",
+    x = "Election Cycle",
+    y = "Total Amount Donated",
+    caption = "Federal Election Commission"
+  )
+
+non_election_year_contribution <- donation_amt_per_cycle |> 
+  filter(!str_detect(election_cycle, "2016|2020|2024")) |> 
+    pivot_wider(
+    names_from = election_cycle,
+    values_from = total_amt_donated,
+    values_fill = 0
+  )
+
+election_year_contribution <- donation_amt_per_cycle |> 
+  filter(!str_detect(election_cycle, "2018|2022")) |> 
+    pivot_wider(
+    names_from = election_cycle,
+    values_from = total_amt_donated,
+    values_fill = 0
+  )
+
+election_year_contribution |> 
+  summarise(
+    pct_change_2016_2020 = ((`2020` - `2016`)/`2016`)*100,
+    pct_change_2020_2024 = ((`2024` - `2020`)/`2020`)*100,
+    pct_change_2016_2024 = ((`2024` - `2016`)/`2016`)*100
+  )
+
+non_election_year_contribution |> 
+  summarise(
+    pct_change_2018_2022 = ((`2022` - `2018`)/`2018`)*100
+  )
+```
+
 
 
 ```{r}
@@ -292,9 +446,9 @@ md_state_clergy_contribs <- md_state_clergy_contribs |>
   mutate(committee_name = str_to_upper(committee_name)) |> 
   mutate(contributor_county_of_residence = str_to_upper(contributor_county_of_residence)) |> 
   mutate(committee_type = str_to_upper(committee_type)) 
-
-#I at least wanted to load and start cleaning the data you provided last class. I'll keep working with this more for my last question#
 ```
+
+
 Questions:
 What denominations have the most clergy contributing money to political campaigns?
 
