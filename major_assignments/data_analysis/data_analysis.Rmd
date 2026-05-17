@@ -195,9 +195,23 @@ dem_clergy_affilliation_and_contributions |>
     sum(total)
   )
 
-write_csv(total_contribution, "total_contribution.csv")
+clergy_affilliation_clean <- clergy_affilliation |> 
+  filter(!str_detect(denomination, "Jewish|Orthodox"))
 
+write_csv(total_contribution, "total_contribution.csv")
+write_csv(clergy_affilliation_clean, "clergy_affilliation_clean.csv")
 ```
+The short answer to this question is that self employed clergy have the single most donors, closely followed by the Baptists, and trailing in third are Methodist Clergy.
+
+The state is very much dominated by Democratic clergy, there is almost no denomination that can even scratch a clergy made up of just 20% republicans. This chart is a good demonstration of that https://datawrapper.dwcdn.net/Sdma1/1/. This chart does demonstrate one of the most interesting findings from this analysis in my opinion, which is that of every denomination in Maryland, the Catholic Church is the most evenly split by far.
+
+Democratic clergy spending, as would be expected by the affiliation breakdown, just dwarfs republican clergy spending. Clergy who registered as democrats outspent republicans by hundreds of thousands of dollars. Dems spent $386268.6, and republicans spent $43217.94. 
+
+The self employed clergy being the single biggest group or "denomination" that contribute money to political campaigns. This I think could be a potential story. The "diversity" of the Catholic Church is also something that could be newsworthy. I think that the story here is either how the Catholic clergy just may be more conservative than any other in the state, or perhaps more interestingly, how Catholic Republican Clergy are simply more politically active than there counterparts in other congregations. 
+
+This data compared to what more nationwide data, like this story from the Pew Research Center: https://www.pewresearch.org/short-reads/2016/02/23/u-s-religious-groups-and-their-political-leanings/, does seem to show that Maryland may just be a solidly democratic state. Interestingly, the Catholic Church data here, and the findings from Pew are relatively similar.
+
+
 Question 2: Are there certain cities or areas that produce clergy that contribute to political campaigns more than others?
 ```{r}
 unique_total_contribution <- total_contribution |> 
@@ -274,6 +288,14 @@ https://datawrapper.dwcdn.net/MJD0d/1/
 Total Donations Map:
 https://datawrapper.dwcdn.net/tX6IK/2/
 
+Moving onto where these clergy donations are coming from in Maryland, the two standout counties were Baltimore County and Anne Arundel County. Baltimore was number one in total campaign contributions, and number three in total donations. Anne Arundel County was number two in total money contributed, but number one in total donations. 
+
+These results did surprise me and I think are newsworthy. Based on other work we have done in this class, I had expected PG and Montgomery Counties to dominate this map. Those counties are both in the top five of both money, and donations (PG is second in donations over Baltimore), but they are solidly behind the other two. I had expected PG and Montgomery to perform better, becasue we have seen that those counties are where there are the biggest and most diverse churches. 
+
+Baltimore and Anne Arundel being out ahead then is newsworthy and could warrant further reporting. It's my hypothesis that while there may be more clergy in PG and Montgomery County, that the clergy that are more likely to contribute political moeny, both financially and demographically are situated more in those counties. I think this would be a good place to start investigating if I was reporting this out.
+
+There is also an outlier contributor in Baltimore County, who is swaying the results of this map, but we will get more into her later in question 4.
+
 
 Question 3: How many of the clergy on the list are actually employed by or working for a real church? (Or are not).
 ```{r}
@@ -317,7 +339,13 @@ Self Employed and Retired:
 https://datawrapper.dwcdn.net/HUqYX/1/ 
 
 Self Employed and Retired Contributions:
-https://datawrapper.dwcdn.net/1psMG/1/ 
+https://datawrapper.dwcdn.net/1psMG/1/
+
+One thing that leapt out to me upon first starting to put this data together was that there were a lot of clergy who identified as either retired or self employed. It turns out that the total number of clergy listed in the data, when duplicates and other noise were removed to the best of my ability, was just under 23% of a total of 1037 clergy. 
+
+Overall as groups self employed clergy donated $60815.54, and retired clergy contributed 74467.83. This would make retirees the third highest spending group out of anyone, and make self employed the fifth. This would represent an overperformance for retirees based on the total number that they represent in the data set, and it would represent a slight underperformance for the self employed who are the single biggest individual group of clergy. The graphs above represent this as well.
+
+This overall was not as newsworthy as I expected. However, the performance of the retirees in terms of contributions did stand out to me, and made me think about why that could be, and the answer turned out to be one outlier contributor.
 
 
 Question 4: Do the outlier individual contributors have anything in common?
@@ -378,6 +406,14 @@ most_money_SANS_DORIS  |>
   )
   
 ```
+I went into this question after having worked on the retired and self employed question above, and had a theory about outlier spenders potentially coming from retirees, and I wanted to see if perhaps those retirees were concentrated in one particular area. To assess big spender, I pulled out the top 100 spending clergy. After doing so it became very obvious that the pattern of big spending among retirees was really just one person. Doris Cowan
+
+There are eight retirees in the top 100 spenders. Doris is number one of those top spender at $50486.82! The next clergy of any sort closest to her was John Price at 37296.50, and then it really kind of falls off a cliff. The next closest retiree to Doris was Frank Trotter at number 33 on the list. When accounting for Doris, retired clergy rank second to baptists in total money contributed within the top 100. When Doris is removed retirees drop off a cliff to number. 
+
+As I alluded to above, I believe that Doris Cowan's contributions are inflating retiree clergy contribution numbers in terms of money contributed, and is definitively what is pushing Baltimore County to the top of money contributed in Maryland counties. 
+
+This spending by her I think could be newsworthy, and my next step as a reporter would simply be to try and call her or family about this. She is by far the biggest spending clergy in the state when it comes politics and that alone is worth looking into.
+
 
 Question 5: What are the general trends in giving by cycle? Are contributions increasing year to year, and what could that trend look like in the future? 
 ```{r}
@@ -436,31 +472,13 @@ non_election_year_contribution |>
     pct_change_2018_2022 = ((`2022` - `2018`)/`2018`)*100
   )
 ```
+Next I looked at how clergy spending has changed over the various election cycles. Overall the generally trend is up. The data does show dips two-year-cycle to two-year-cycle, but these dips I think are due to spending differences between midterm elections and full bore presidential election years like 2016, 2020, and 2024. The biggest jump between any cycles was 2016 to 2024, where the spending by clergy went from 125287.74 to 343440.20, or a percent change of 224. The next jump in presidential election cycle spending 2020-2024, was stil up but more modest at 18%. 
+
+Spending on midterms has also increased drastically with midterm spending from 2018-2022 jumping from 65371.53 in 2018 to 207859.95 in 2022, or a percent change of 217.
+
+This section I don't think is particularly newsworthy as it matches many known trends. Campaign spending and donations are only going up in the united states: see this pew research piece that was published in 2017 is still a good indicator of this https://www.pewresearch.org/short-reads/2017/05/17/5-facts-about-u-s-political-donations/. This piece also I demonstrates why clergy spending in particularly would be expected to go up. Clergy in the US are mostly democratic (more likley to donate), most probably make enough to have some extra money (more liekly to donate), and most clergy are going to have some level of education (more liekly to donate). 
 
 
-
-```{r}
-md_state_clergy_contribs <- read_csv("md_contribs.csv")
-
-md_state_clergy_contribs <- md_state_clergy_contribs |> 
-  mutate(committee_name = str_to_upper(committee_name)) |> 
-  mutate(contributor_county_of_residence = str_to_upper(contributor_county_of_residence)) |> 
-  mutate(committee_type = str_to_upper(committee_type)) 
-```
-
-
-Questions:
-What denominations have the most clergy contributing money to political campaigns?
-
-Are there certain cities or areas that produce clergy that contribute to political campaigns more than others?
-
-How many of the clergy on the list are actually employed by or working for a real church? 
-
-Do the outlier individual contributors have anything in common?
-
-What are the general trends in giving by cycle? Are contributions increasing year to year, and what could that trend look like in the future? 
-
-Do these clergy donors also give to Maryland state campaigns? 
 
 
 
